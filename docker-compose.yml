@@ -1,0 +1,44 @@
+services:
+  sternsinger:
+    build: .
+    container_name: sternsinger-verwaltung
+    restart: unless-stopped
+    ports:
+      - "${PORT:-8088}:8000"
+    environment:
+      ADMIN_USER: "${ADMIN_USER:-admin}"
+      ADMIN_PASSWORD: "${ADMIN_PASSWORD:-bitte-aendern}"
+      MANAGEMENT_USER: "${MANAGEMENT_USER:-verwaltung}"
+      MANAGEMENT_PASSWORD: "${MANAGEMENT_PASSWORD:-bitte-aendern}"
+      DONATION_USER: "${DONATION_USER:-spenden}"
+      DONATION_PASSWORD: "${DONATION_PASSWORD:-bitte-aendern}"
+      SECRET_KEY: "${SECRET_KEY:-BITTE-EINEN-LANGEN-ZUFAELLIGEN-SECRET-KEY-SETZEN}"
+      SESSION_COOKIE_SECURE: "${SESSION_COOKIE_SECURE:-false}"
+      DATA_DIR: /data
+      MAX_UPLOAD_BYTES: "${MAX_UPLOAD_BYTES:-10485760}"
+      OSM_USER_AGENT: "${OSM_USER_AGENT:-sternsinger-verwaltung/1.1}"
+      OSM_NOMINATIM_URL: "${OSM_NOMINATIM_URL:-https://nominatim.openstreetmap.org/search}"
+      OSM_OVERPASS_URL: "${OSM_OVERPASS_URL:-https://overpass-api.de/api/interpreter}"
+      OSM_OVERPASS_FALLBACK_URL: "${OSM_OVERPASS_FALLBACK_URL:-https://overpass.kumi.systems/api/interpreter}"
+      OSM_MAP_URL: "${OSM_MAP_URL:-https://api.openstreetmap.org/api/0.6/map}"
+      OSM_OSRM_URL: "${OSM_OSRM_URL:-https://router.project-osrm.org}"
+      OSM_TILE_URL: "${OSM_TILE_URL:-https://tile.openstreetmap.org/{z}/{x}/{y}.png}"
+      APP_BASE_URL: "${APP_BASE_URL:-}"
+      SMTP_HOST: "${SMTP_HOST:-}"
+      SMTP_PORT: "${SMTP_PORT:-587}"
+      SMTP_USER: "${SMTP_USER:-}"
+      SMTP_PASSWORD: "${SMTP_PASSWORD:-}"
+      SMTP_FROM: "${SMTP_FROM:-}"
+      SMTP_SECURITY: "${SMTP_SECURITY:-starttls}"
+      RESET_TOKEN_TTL_MINUTES: "${RESET_TOKEN_TTL_MINUTES:-30}"
+    volumes:
+      - sternsinger_data:/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  sternsinger_data:

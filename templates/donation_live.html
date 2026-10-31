@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<title>Spenden – Liveanzeige</title>
+<style>
+:root{
+  --bg:#07111f;--panel:#0d1d31;--line:#1b3553;--gold:#f7c948;--gold2:#f39c12;
+  --text:#f8fbff;--muted:#93a9bf;--green:#45d483;
+  --page-pad:20px;--stage-gap:14px;--card-gap:12px;--card-pad:15px;
+  --group-name-size:22px;--group-sum-size:26px;--bar-height:18px;--total-size:112px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#07111f;color:var(--text);font-family:Inter,Segoe UI,Arial,sans-serif}
+body{min-height:100dvh;background:radial-gradient(circle at 20% 0,#163253 0,#07111f 45%,#03080f 100%);padding:var(--page-pad)}
+.stage{height:calc(100dvh - (var(--page-pad) * 2));display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;gap:var(--stage-gap);position:relative;z-index:2;min-height:0}
+.top{display:flex;align-items:center;justify-content:space-between;gap:20px;min-width:0}
+.eyebrow{font-size:clamp(13px,1.2vw,21px);letter-spacing:.16em;text-transform:uppercase;color:var(--muted);font-weight:800;white-space:nowrap}
+.date{font-size:clamp(14px,1.25vw,22px);color:var(--muted);white-space:nowrap}
+.total-wrap{text-align:center;min-height:0}
+.total-label{font-size:clamp(14px,1.35vw,24px);color:var(--muted);font-weight:700}
+.total{font-variant-numeric:tabular-nums;font-size:var(--total-size);font-weight:900;line-height:.92;letter-spacing:-.055em;background:linear-gradient(180deg,#fff8ce 0,var(--gold) 55%,#ef9d19 100%);-webkit-background-clip:text;background-clip:text;color:transparent;text-shadow:0 18px 55px rgba(247,201,72,.12);transition:transform .28s ease;white-space:nowrap}
+.total.bump{transform:scale(1.035)}
+.groups{display:grid;gap:var(--card-gap);min-height:0;overflow:hidden;align-items:stretch;justify-items:stretch}
+.group{min-width:0;min-height:0;background:linear-gradient(145deg,rgba(17,39,64,.92),rgba(8,23,40,.9));border:1px solid var(--line);border-radius:16px;padding:var(--card-pad);box-shadow:0 12px 36px rgba(0,0,0,.24);transition:border-color .35s,transform .35s,box-shadow .35s;display:flex;flex-direction:column;justify-content:center;overflow:hidden}
+.group.changed{border-color:var(--gold);transform:translateY(-2px);box-shadow:0 12px 42px rgba(247,201,72,.18)}
+.group-head{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:clamp(6px,1vh,12px);min-width:0}
+.group-name{font-size:var(--group-name-size);font-weight:850;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.group-sum{font-size:var(--group-sum-size);font-weight:900;font-variant-numeric:tabular-nums;white-space:nowrap}
+.track{height:var(--bar-height);border-radius:999px;background:#071422;overflow:hidden;border:1px solid #17304a;flex:0 0 auto}
+.bar{height:100%;width:0;border-radius:inherit;background:linear-gradient(90deg,var(--gold2),#ffd76b);box-shadow:0 0 24px rgba(247,201,72,.35);transition:width 900ms cubic-bezier(.2,.8,.2,1)}
+.footer{display:flex;justify-content:space-between;align-items:center;gap:20px;color:var(--muted);font-size:clamp(11px,.95vw,16px);min-width:0}
+.state{display:inline-flex;align-items:center;gap:8px;min-width:0}.dot{width:9px;height:9px;border-radius:50%;background:var(--green);box-shadow:0 0 14px var(--green);flex:0 0 auto}.closed .dot{background:var(--gold);box-shadow:0 0 14px var(--gold)}
+.controls{position:fixed;right:12px;top:12px;z-index:30;display:flex;gap:7px;opacity:.1;transition:opacity .2s}.controls:hover,.controls:focus-within{opacity:1}.controls button{border:1px solid #365372;background:#0a1a2c;color:#fff;border-radius:9px;padding:8px 11px;font-weight:800;cursor:pointer}
+.empty{grid-column:1/-1;display:grid;place-items:center;color:var(--muted);font-size:clamp(18px,2vw,30px);padding:20px}
+.spark{position:fixed;pointer-events:none;z-index:4;color:var(--gold);font-size:18px;animation:floatSpark 1.45s ease-out forwards}@keyframes floatSpark{0%{opacity:0;transform:translate(0,20px) scale(.4) rotate(0)}20%{opacity:1}100%{opacity:0;transform:translate(var(--dx),-120px) scale(1.25) rotate(160deg)}}
+
+/* Meilenstein-Ebene: gut lesbar, lange sichtbar und bei 5.000/10.000 deutlich festlicher */
+.milestone{position:fixed;inset:0;z-index:20;pointer-events:none;display:grid;place-items:center;opacity:0;visibility:hidden;overflow:hidden}
+.milestone{--milestone-duration:9s}.milestone.show{visibility:visible;animation:milestoneLayer var(--milestone-duration) ease both}
+.milestone-backdrop{position:absolute;inset:-10%;background:radial-gradient(circle at 50% 50%,rgba(255,238,156,.40) 0,rgba(247,201,72,.18) 24%,rgba(7,17,31,.82) 66%,rgba(0,0,0,.92) 100%);transform:scale(.4);opacity:0}
+.milestone.show .milestone-backdrop{animation:milestoneGlow var(--milestone-duration) ease-out both}
+.milestone-card{position:relative;text-align:center;max-width:min(1180px,92vw);padding:clamp(30px,5.2vmin,72px) clamp(30px,7vmin,96px);border-radius:34px;background:linear-gradient(180deg,rgba(10,24,40,.98),rgba(3,10,18,.985));border:2px solid rgba(247,201,72,.92);box-shadow:0 0 100px rgba(247,201,72,.42),0 28px 90px rgba(0,0,0,.58),inset 0 0 80px rgba(247,201,72,.08);backdrop-filter:blur(5px);transform:scale(.55);opacity:0;isolation:isolate;overflow:hidden}
+.milestone.show .milestone-card{animation:milestoneCard var(--milestone-duration) cubic-bezier(.2,.9,.25,1) both}
+.milestone-kicker{font-size:clamp(18px,2.25vw,36px);font-weight:1000;letter-spacing:.12em;color:#ffe9a2;text-transform:uppercase;text-shadow:0 0 22px rgba(247,201,72,.35)}
+.milestone-amount{margin-top:6px;font-size:clamp(68px,13vw,220px);line-height:.92;font-weight:1000;letter-spacing:-.06em;color:#fff4bd;text-shadow:0 0 24px rgba(247,201,72,.7),0 0 70px rgba(243,156,18,.45);white-space:nowrap}
+.milestone-sub{margin:18px auto 0;max-width:1000px;font-size:clamp(20px,2.35vw,38px);line-height:1.22;font-weight:900;color:#fff}.milestone-cheer{margin-top:18px;font-size:clamp(17px,1.7vw,28px);font-weight:950;letter-spacing:.08em;color:#ffd96a;text-transform:uppercase}.milestone-starline{margin:14px auto 0;font-size:clamp(18px,2vw,34px);letter-spacing:.26em;color:#ffe9a2;text-shadow:0 0 18px rgba(247,201,72,.7)}
+
+.milestone-card::before{content:"";position:absolute;inset:-45%;z-index:-2;background:conic-gradient(from 0deg,transparent 0 8deg,rgba(255,228,129,.13) 8deg 14deg,transparent 14deg 30deg);animation:slowSpin 18s linear infinite}
+.milestone-card::after{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;background:radial-gradient(circle at 50% 12%,rgba(255,241,176,.16),transparent 38%);pointer-events:none}
+.milestone-rays{position:absolute;inset:-30%;opacity:0;transform:scale(.4) rotate(0deg);background:repeating-conic-gradient(from 0deg,rgba(255,226,112,.18) 0 2deg,transparent 2deg 14deg);mask-image:radial-gradient(circle,transparent 0 17%,#000 31%,transparent 74%)}
+.milestone.show .milestone-rays{animation:raysCelebrate var(--milestone-duration) ease-out both}
+.milestone-crown{position:absolute;top:clamp(22px,5vh,56px);left:50%;transform:translateX(-50%) scale(.3);font-size:clamp(44px,6vw,92px);filter:drop-shadow(0 0 22px rgba(247,201,72,.65));opacity:0}
+.milestone.tier-5000.show .milestone-crown,.milestone.tier-10000.show .milestone-crown{animation:crownPop var(--milestone-duration) cubic-bezier(.15,.8,.2,1) both}
+.milestone.tier-1000 .milestone-crown{display:none}
+.milestone.tier-5000 .milestone-crown::before{content:"✨"}
+.milestone.tier-10000 .milestone-crown::before{content:"👑"}
+.milestone-firework{position:fixed;width:12px;height:12px;border-radius:50%;z-index:23;pointer-events:none;opacity:0;background:#fff3a6;box-shadow:0 0 0 0 rgba(247,201,72,.8)}
+.milestone-firework::before,.milestone-firework::after{content:"";position:absolute;left:50%;top:50%;width:5px;height:5px;border-radius:50%;background:#fff8cf;box-shadow:0 -48px 0 #f7c948,34px -34px 0 #fff,48px 0 0 #f39c12,34px 34px 0 #ffd76b,0 48px 0 #fff,-34px 34px 0 #f7c948,-48px 0 0 #fff,-34px -34px 0 #f39c12;transform:translate(-50%,-50%) scale(.15)}
+.milestone-firework::after{transform:translate(-50%,-50%) rotate(22.5deg) scale(.12);opacity:.8}
+.milestone-firework.burst{animation:fireworkCore 2.4s ease-out var(--delay) both}.milestone-firework.burst::before{animation:fireworkRing 2.4s cubic-bezier(.12,.7,.2,1) var(--delay) both}.milestone-firework.burst::after{animation:fireworkRing2 2.4s cubic-bezier(.12,.7,.2,1) var(--delay) both}
+.milestone.tier-5000 .milestone-card{transform-origin:center}.milestone.tier-5000 .milestone-kicker{color:#fff0b3}.milestone.tier-5000 .milestone-cheer{font-size:clamp(20px,2vw,34px)}
+.milestone.tier-10000 .milestone-card{background:linear-gradient(180deg,rgba(14,26,42,.99),rgba(2,8,15,.995))}.milestone.tier-10000 .milestone-kicker{font-size:clamp(23px,2.8vw,44px);letter-spacing:.14em;color:#fff3b4}.milestone.tier-10000 .milestone-sub{font-size:clamp(24px,2.8vw,44px)}.milestone.tier-10000 .milestone-cheer{font-size:clamp(22px,2.4vw,40px);color:#fff0a3}
+.milestone.tier-5000{--milestone-duration:12s}.milestone.tier-5000 .milestone-card{border-width:3px;background:rgba(4,12,22,.97);box-shadow:0 0 130px rgba(247,201,72,.52),inset 0 0 90px rgba(247,201,72,.10)}
+.milestone.tier-10000{--milestone-duration:15s}.milestone.tier-10000 .milestone-card{border-width:4px;background:rgba(5,12,20,.985);box-shadow:0 0 180px rgba(255,218,94,.72),0 0 45px rgba(255,255,255,.30),inset 0 0 110px rgba(247,201,72,.14)}
+.milestone.tier-10000 .milestone-amount{font-size:clamp(78px,15vw,250px);text-shadow:0 0 28px #fff1a8,0 0 90px rgba(247,201,72,.95),0 0 160px rgba(243,156,18,.62)}
+.particle{position:fixed;left:50%;top:50%;z-index:21;width:var(--size);height:var(--size);border-radius:50%;background:var(--particle,#f7c948);box-shadow:0 0 12px var(--particle,#f7c948);pointer-events:none;opacity:0;animation:particleBurst var(--dur) cubic-bezier(.15,.65,.2,1) var(--delay) forwards}
+.particle.star-particle{width:auto;height:auto;background:none;box-shadow:none;color:var(--particle,#f7c948);font-size:var(--size);line-height:1}
+.confetti{position:fixed;top:-8vh;left:var(--left);z-index:22;width:var(--w);height:var(--h);border-radius:2px;background:var(--c);pointer-events:none;opacity:0;animation:confettiFall var(--dur) linear var(--delay) forwards;transform:rotate(var(--r))}
+@keyframes milestoneLayer{0%{opacity:0}4%{opacity:1}93%{opacity:1}100%{opacity:0}}
+@keyframes milestoneGlow{0%{opacity:0;transform:scale(.25)}8%{opacity:1;transform:scale(.88)}76%{opacity:.82;transform:scale(1.12)}100%{opacity:0;transform:scale(1.42)}}
+@keyframes milestoneCard{0%{opacity:0;transform:scale(.55) rotate(-.7deg)}6%{opacity:1;transform:scale(1.035) rotate(.15deg)}11%{transform:scale(1)}91%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.025)}}
+@keyframes particleBurst{0%{opacity:0;transform:translate(-50%,-50%) scale(.2) rotate(0)}10%{opacity:1}100%{opacity:0;transform:translate(calc(-50% + var(--x)),calc(-50% + var(--y))) scale(var(--scale)) rotate(var(--rot))}}
+@keyframes confettiFall{0%{opacity:0;transform:translate3d(0,-6vh,0) rotate(var(--r))}8%{opacity:1}82%{opacity:1}100%{opacity:0;transform:translate3d(var(--drift),112vh,0) rotate(calc(var(--r) + 780deg))}}
+
+
+@keyframes slowSpin{to{transform:rotate(360deg)}}
+@keyframes raysCelebrate{0%{opacity:0;transform:scale(.38) rotate(-12deg)}7%{opacity:.95;transform:scale(.88) rotate(0)}55%{opacity:.55;transform:scale(1.08) rotate(10deg)}100%{opacity:0;transform:scale(1.26) rotate(20deg)}}
+@keyframes crownPop{0%{opacity:0;transform:translateX(-50%) translateY(18px) scale(.2) rotate(-8deg)}7%{opacity:1;transform:translateX(-50%) translateY(0) scale(1.14) rotate(4deg)}13%{transform:translateX(-50%) scale(1) rotate(0)}90%{opacity:1}100%{opacity:0;transform:translateX(-50%) translateY(-10px) scale(1.04)}}
+@keyframes fireworkCore{0%{opacity:0;transform:scale(.3)}18%{opacity:1;transform:scale(1)}55%{opacity:.7}100%{opacity:0;transform:scale(.2)}}
+@keyframes fireworkRing{0%,12%{opacity:0;transform:translate(-50%,-50%) scale(.08)}26%{opacity:1}100%{opacity:0;transform:translate(-50%,-50%) scale(2.25)}}
+@keyframes fireworkRing2{0%,15%{opacity:0;transform:translate(-50%,-50%) rotate(22.5deg) scale(.08)}30%{opacity:.95}100%{opacity:0;transform:translate(-50%,-50%) rotate(22.5deg) scale(1.85)}}
+@media(max-width:700px){.controls{opacity:.75}.top{gap:10px}.eyebrow{white-space:normal}.footer{gap:10px}.milestone-card{border-radius:22px;padding:28px 20px}.milestone-crown{top:14px}.milestone-starline{letter-spacing:.14em}}
+@media(prefers-reduced-motion:reduce){*{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+</style>
+
+<!-- Liveansicht bleibt bewusst fest im v33-Stil; kein Hell/Dunkel-Modus. -->
+
+</head>
+<body>
+<div class="controls"><button onclick="toggleFullscreen()">⛶ Vollbild</button><button onclick="window.close()">✕ Schließen</button></div>
+<div class="stage">
+  <div class="top"><div class="eyebrow">✨ Sternsinger · Live</div><div class="date" id="dateText">–</div></div>
+  <div class="total-wrap"><div class="total-label">Gesamtspendensumme</div><div class="total" id="total">0,00 €</div></div>
+  <div class="groups" id="groups"><div class="empty">Noch keine Spendendaten.</div></div>
+  <div class="footer"><div class="state" id="state"><span class="dot"></span><span>Live · wird automatisch aktualisiert</span></div><div id="updated">–</div></div>
+</div>
+<div class="milestone" id="milestone" aria-hidden="true">
+  <div class="milestone-backdrop"></div>
+  <div class="milestone-rays"></div>
+  <div class="milestone-crown" aria-hidden="true"></div>
+  <div class="milestone-card">
+    <div class="milestone-kicker" id="milestoneKicker">Meilenstein</div>
+    <div class="milestone-amount" id="milestoneAmount">1.000 €</div>
+    <div class="milestone-sub" id="milestoneSub">Gemeinsam geschafft!</div>
+    <div class="milestone-cheer" id="milestoneCheer">Weiter so!</div>
+    <div class="milestone-starline" aria-hidden="true">★ ✦ ★ ✦ ★</div>
+  </div>
+</div>
+<script>
+let previous={total:0,groups:{}};
+let firstLoad=true;
+let milestoneTimer=null;
+const euro=v=>Number(v||0).toLocaleString('de-DE',{style:'currency',currency:'EUR'});
+const euroWhole=v=>Number(v||0).toLocaleString('de-DE',{maximumFractionDigits:0})+' €';
+const esc=s=>String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+const clamp=(v,min,max)=>Math.max(min,Math.min(max,v));
+
+function animateNumber(el,from,to,duration=760){
+  const start=performance.now();
+  function frame(now){const p=Math.min(1,(now-start)/duration);const eased=1-Math.pow(1-p,3);el.textContent=euro(from+(to-from)*eased);if(p<1)requestAnimationFrame(frame)}
+  requestAnimationFrame(frame);
+}
+
+function smallCelebrate(){
+  for(let i=0;i<9;i++){
+    const s=document.createElement('div');s.className='spark';s.textContent='★';
+    s.style.left=(28+Math.random()*44)+'vw';s.style.top=(46+Math.random()*18)+'vh';
+    s.style.setProperty('--dx',((Math.random()-.5)*140)+'px');s.style.animationDelay=(Math.random()*.12)+'s';
+    document.body.appendChild(s);setTimeout(()=>s.remove(),1800);
+  }
+}
+
+function crossedMilestone(from,to){
+  if(to<=from || to<1000)return null;
+  const first=Math.floor(from/1000)+1, last=Math.floor(to/1000);
+  let best=null;
+  for(let k=first;k<=last;k++){
+    const amount=k*1000;
+    const tier=amount%10000===0?10000:(amount%5000===0?5000:1000);
+    if(!best || tier>best.tier || (tier===best.tier && amount>best.amount)) best={amount,tier};
+  }
+  return best;
+}
+
+function launchParticles(tier){
+  const count=tier===10000?180:(tier===5000?118:52);
+  const distance=tier===10000?Math.max(innerWidth,innerHeight)*.78:(tier===5000?Math.max(innerWidth,innerHeight)*.62:Math.max(innerWidth,innerHeight)*.40);
+  for(let i=0;i<count;i++){
+    const p=document.createElement('div');
+    const star=i%4===0;p.className='particle'+(star?' star-particle':'');if(star)p.textContent='★';
+    const angle=Math.random()*Math.PI*2;const d=distance*(.35+Math.random()*.72);
+    p.style.setProperty('--x',(Math.cos(angle)*d)+'px');p.style.setProperty('--y',(Math.sin(angle)*d)+'px');
+    p.style.setProperty('--rot',((Math.random()-.5)*1080)+'deg');p.style.setProperty('--scale',(0.65+Math.random()*1.9).toFixed(2));
+    p.style.setProperty('--size',(tier===10000?9+Math.random()*22:6+Math.random()*16)+'px');
+    p.style.setProperty('--dur',(tier===10000?2.2+Math.random()*1.6:1.55+Math.random()*1.15)+'s');
+    p.style.setProperty('--delay',(Math.random()*(tier===10000?.55:.32))+'s');
+    const palette=tier===10000?['#fff4b8','#f7c948','#f39c12','#ffffff','#ffdf6b']:['#f7c948','#ffd76b','#f39c12','#ffffff'];
+    p.style.setProperty('--particle',palette[Math.floor(Math.random()*palette.length)]);
+    document.body.appendChild(p);setTimeout(()=>p.remove(),4600);
+  }
+  if(tier>=5000) launchConfettiWaves(tier);
+}
+
+function launchConfettiWaves(tier){
+  const waves=tier===10000?7:4;
+  const perWave=tier===10000?66:46;
+  const palette=['#f7c948','#f39c12','#ffffff','#ffd76b','#e74c3c','#4fc3f7','#7ee081'];
+  for(let wave=0;wave<waves;wave++){
+    const baseDelay=wave*(tier===10000?1.05:1.25);
+    for(let i=0;i<perWave;i++){
+      const c=document.createElement('div');c.className='confetti';
+      c.style.setProperty('--left',(Math.random()*100)+'vw');
+      c.style.setProperty('--w',(5+Math.random()*8)+'px');
+      c.style.setProperty('--h',(9+Math.random()*15)+'px');
+      c.style.setProperty('--c',palette[Math.floor(Math.random()*palette.length)]);
+      c.style.setProperty('--r',Math.floor(Math.random()*360)+'deg');
+      c.style.setProperty('--drift',((Math.random()-.5)*28)+'vw');
+      c.style.setProperty('--dur',(3.7+Math.random()*2.3)+'s');
+      c.style.setProperty('--delay',(baseDelay+Math.random()*.55)+'s');
+      document.body.appendChild(c);setTimeout(()=>c.remove(),(baseDelay+6.8)*1000);
+    }
+  }
+}
+
+function launchFireworks(tier){
+  if(tier<5000)return;
+  const points=tier===10000?
+    [[12,24,.2],[88,22,.55],[20,68,1.35],[80,66,1.75],[50,16,2.55],[50,76,3.25]]:
+    [[16,28,.35],[84,26,.8],[24,70,1.7],[76,68,2.2]];
+  points.forEach(([x,y,delay])=>{
+    const f=document.createElement('div');f.className='milestone-firework burst';
+    f.style.left=x+'vw';f.style.top=y+'vh';f.style.setProperty('--delay',delay+'s');
+    document.body.appendChild(f);setTimeout(()=>f.remove(),(delay+3.2)*1000);
+  });
+}
+
+const milestoneMessages=[
+  null,
+  {k:'⭐ 1.000 €! ⭐',s:'Die ersten tausend sind geschafft. Stark gemacht, ihr Sternsinger!'},
+  {k:'✨ 2.000 €! ✨',s:'Schon zweitausend. Ihr seid richtig gut unterwegs!'},
+  {k:'🌟 3.000 €! 🌟',s:'Dreitausend! Das läuft richtig gut.'},
+  {k:'👏 4.000 €! 👏',s:'Viertausend – und die 5.000 sind schon ganz nah!'},
+  {k:'🎉 5.000 €! 🎉',s:'Fünftausend! Das habt ihr euch erlaufen, ersungen und gesammelt.'},
+  {k:'⭐ 6.000 €! ⭐',s:'Sechstausend. Weiter so – ihr macht das klasse!'},
+  {k:'🙌 7.000 €! 🙌',s:'Siebentausend! Ihr legt heute richtig was vor.'},
+  {k:'🔥 8.000 €! 🔥',s:'Achttausend. Wahnsinn, was ihr heute zusammen schafft!'},
+  {k:'🌠 9.000 €! 🌠',s:'Neuntausend – gleich knackt ihr die 10.000!'},
+  {k:'🌟 10.000 €! 🌟',s:'Zehntausend! Ihr seid der Hammer. Das ist euer gemeinsamer Erfolg!'},
+  {k:'🎊 11.000 €! 🎊',s:'Elftausend – und ihr macht einfach weiter!'},
+  {k:'💪 12.000 €! 💪',s:'Zwölftausend. Richtig stark, was ihr da auf die Beine stellt!'},
+  {k:'⭐ 13.000 €! ⭐',s:'Dreizehntausend! Haus für Haus kommt ordentlich was zusammen.'},
+  {k:'🚀 14.000 €! 🚀',s:'Vierzehntausend – die 15.000 sind zum Greifen nah!'},
+  {k:'🎉 15.000 €! 🎉',s:'Fünfzehntausend! Das ist richtig groß. Feiert euch kurz dafür!'},
+  {k:'🌟 16.000 €! 🌟',s:'Sechzehntausend. Was für ein Tag mit euch!'},
+  {k:'👏 17.000 €! 👏',s:'Siebzehntausend – ihr seid noch lange nicht fertig!'},
+  {k:'🔥 18.000 €! 🔥',s:'Achtzehntausend. Einfach klasse, was ihr zusammen gesammelt habt!'},
+  {k:'🌠 19.000 €! 🌠',s:'Neunzehntausend – nur noch ein Tausender bis zur 20.000!'},
+  {k:'🏆 20.000 €! 🏆',s:'Zwanzigtausend! Riesig. Das habt ihr zusammen geschafft!'},
+  {k:'⭐ 21.000 €! ⭐',s:'Einundzwanzigtausend – es geht tatsächlich noch weiter!'},
+  {k:'🙌 22.000 €! 🙌',s:'Zweiundzwanzigtausend. Ihr könnt richtig stolz auf euch sein!'},
+  {k:'✨ 23.000 €! ✨',s:'Dreiundzwanzigtausend – jeder Weg und jedes Klingeln hat gezählt.'},
+  {k:'👏 24.000 €! 👏',s:'Vierundzwanzigtausend – gleich fällt schon die nächste große Marke!'},
+  {k:'🎉 25.000 €! 🎉',s:'Fünfundzwanzigtausend! Was für eine Zahl. Stark, Sternsinger!'},
+  {k:'🌟 26.000 €! 🌟',s:'Sechsundzwanzigtausend. Ihr sammelt und sammelt und sammelt!'},
+  {k:'🔥 27.000 €! 🔥',s:'Siebenundzwanzigtausend – ihr gebt heute wirklich alles.'},
+  {k:'⭐ 28.000 €! ⭐',s:'Achtundzwanzigtausend. Das kann sich wirklich sehen lassen!'},
+  {k:'🌠 29.000 €! 🌠',s:'Neunundzwanzigtausend – gleich steht vorne eine 3!'},
+  {k:'🏆 30.000 €! 🏆',s:'Dreißigtausend! Was für ein Ergebnis. Das ist euer Tag!'}
+];
+
+const extraMilestoneLines=[
+  'Und ihr macht weiter – stark!',
+  'Noch ein Tausender mehr. Klasse gemacht!',
+  'Haus für Haus wächst eure Summe weiter.',
+  'Das habt ihr euch wirklich erarbeitet.',
+  'Ihr könnt richtig stolz auf euch sein.',
+  'Was für ein starkes Team!',
+  'Weiter so, Sternsinger!',
+  'Das ist euer gemeinsamer Erfolg.'
+];
+
+function milestoneCopy(info){
+  const step=Math.max(1,Math.floor(info.amount/1000));
+  if(milestoneMessages[step]) return milestoneMessages[step];
+  if(info.tier===10000) return {k:`🏆 RIESEN-MEILENSTEIN 🏆`,s:`${step}.000 € – gemeinsam habt ihr eine unglaubliche Marke geknackt!`};
+  if(info.tier===5000) return {k:`🎉 GROSSER MEILENSTEIN 🎉`,s:`${step}.000 € – wieder fünftausend mehr. Richtig stark, ihr Sternsinger!`};
+  const line=extraMilestoneLines[(step-31)%extraMilestoneLines.length];
+  return {k:`⭐ ${step}.000 €! ⭐`,s:line};
+}
+
+function showMilestone(info){
+  const layer=document.getElementById('milestone');
+  clearTimeout(milestoneTimer);
+  layer.classList.remove('show','tier-1000','tier-5000','tier-10000');
+  void layer.offsetWidth;
+  const tierClass=info.tier===10000?'tier-10000':(info.tier===5000?'tier-5000':'tier-1000');
+  layer.classList.add(tierClass);
+  const copy=milestoneCopy(info);
+  document.getElementById('milestoneAmount').textContent=euroWhole(info.amount);
+  document.getElementById('milestoneKicker').textContent=copy.k;
+  document.getElementById('milestoneSub').textContent=copy.s;
+  document.getElementById('milestoneCheer').textContent=info.tier===10000?'Was für ein Sternsinger-Moment!':(info.tier===5000?'Das feiern wir!':'Gemeinsam stark!');
+  layer.classList.add('show');launchParticles(info.tier);launchFireworks(info.tier);
+  milestoneTimer=setTimeout(()=>layer.classList.remove('show'),info.tier===10000?15200:(info.tier===5000?12200:9200));
+}
+
+function formatDate(v){if(!v)return '–';const [y,m,d]=v.split('-');return y&&m&&d?`${d}.${m}.${y}`:v}
+
+function fitLiveLayout(){
+  const root=document.documentElement;
+  const vw=Math.max(320,window.innerWidth), vh=Math.max(240,window.innerHeight);
+  const shortest=Math.min(vw,vh);
+  root.style.setProperty('--page-pad',clamp(shortest*.022,8,30)+'px');
+  root.style.setProperty('--stage-gap',clamp(vh*.018,7,20)+'px');
+  root.style.setProperty('--total-size',clamp(Math.min(vw*.13,vh*.17),48,190)+'px');
+
+  const container=document.getElementById('groups');
+  const cards=[...container.querySelectorAll('.group')];
+  if(!cards.length)return;
+  const rect=container.getBoundingClientRect();
+  const n=cards.length;
+  const gap=clamp(shortest*.012,6,16);
+  let best=null;
+  const maxCols=Math.min(n,Math.max(1,Math.floor(rect.width/180)));
+  for(let cols=1;cols<=maxCols;cols++){
+    const rows=Math.ceil(n/cols);
+    const cellW=(rect.width-gap*(cols-1))/cols;
+    const cellH=(rect.height-gap*(rows-1))/rows;
+    if(cellW<=0||cellH<=0)continue;
+    const readability=Math.min(cellW/300,cellH/92);
+    const shapePenalty=Math.abs((cellW/cellH)-3.1)*.045;
+    const score=readability-shapePenalty;
+    if(!best||score>best.score)best={cols,rows,cellW,cellH,score};
+  }
+  if(!best)best={cols:1,rows:n,cellW:rect.width,cellH:Math.max(45,rect.height/n)};
+  container.style.gridTemplateColumns=`repeat(${best.cols},minmax(0,1fr))`;
+  container.style.gridTemplateRows=`repeat(${best.rows},minmax(0,1fr))`;
+  root.style.setProperty('--card-gap',gap+'px');
+  root.style.setProperty('--card-pad',clamp(Math.min(best.cellW*.045,best.cellH*.16),7,22)+'px');
+  root.style.setProperty('--group-name-size',clamp(Math.min(best.cellW*.064,best.cellH*.29),12,32)+'px');
+  root.style.setProperty('--group-sum-size',clamp(Math.min(best.cellW*.07,best.cellH*.32),13,36)+'px');
+  root.style.setProperty('--bar-height',clamp(best.cellH*.16,8,23)+'px');
+}
+
+function render(data){
+  const totalEl=document.getElementById('total');
+  const newTotal=Number(data.total||0);
+  if(!firstLoad&&newTotal!==previous.total){
+    animateNumber(totalEl,previous.total,newTotal);totalEl.classList.add('bump');setTimeout(()=>totalEl.classList.remove('bump'),300);
+    if(newTotal>previous.total){
+      smallCelebrate();
+      const milestone=crossedMilestone(previous.total,newTotal);if(milestone)showMilestone(milestone);
+    }
+  }else totalEl.textContent=euro(newTotal);
+
+  document.getElementById('dateText').textContent=formatDate(data.date);
+  const max=Math.max(1,...(data.groups||[]).map(g=>Number(g.sum||0)));
+  const groups=document.getElementById('groups');
+  groups.innerHTML=(data.groups||[]).length?(data.groups||[]).map(g=>{
+    const old=previous.groups[g.id];const changed=!firstLoad&&old!==undefined&&old!==Number(g.sum||0);
+    return `<div class="group ${changed?'changed':''}" data-id="${esc(g.id)}"><div class="group-head"><div class="group-name" title="${esc(g.name)}">${esc(g.name)}</div><div class="group-sum">${euro(g.sum)}</div></div><div class="track"><div class="bar" style="width:${Math.max(2,(Number(g.sum||0)/max)*100)}%"></div></div></div>`;
+  }).join(''):'<div class="empty">Noch keine Spendendaten.</div>';
+
+  const state=document.getElementById('state');state.classList.toggle('closed',!!data.closed);state.querySelector('span:last-child').textContent=data.closed?'Ergebnis abgeschlossen':'Live · wird automatisch aktualisiert';
+  document.getElementById('updated').textContent='Stand: '+new Date().toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  previous={total:newTotal,groups:Object.fromEntries((data.groups||[]).map(g=>[g.id,Number(g.sum||0)]))};firstLoad=false;
+  requestAnimationFrame(fitLiveLayout);
+}
+
+async function refresh(){
+  try{
+    const r=await fetch('/api/donations/live',{cache:'no-store'});
+    if(r.status===401){location='/login?next=/spenden-live';return}
+    if(!r.ok)throw new Error();render(await r.json());
+  }catch(e){document.getElementById('updated').textContent='Verbindung unterbrochen – neuer Versuch…'}
+}
+function toggleFullscreen(){if(!document.fullscreenElement)document.documentElement.requestFullscreen?.();else document.exitFullscreen?.()}
+window.addEventListener('resize',()=>requestAnimationFrame(fitLiveLayout));
+window.visualViewport?.addEventListener('resize',()=>requestAnimationFrame(fitLiveLayout));
+new ResizeObserver(()=>requestAnimationFrame(fitLiveLayout)).observe(document.querySelector('.stage'));
+refresh();setInterval(refresh,1500);
+</script>
+</body>
+</html>
